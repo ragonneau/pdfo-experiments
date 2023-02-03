@@ -1,3 +1,4 @@
+import csv
 import re
 import sys
 import warnings
@@ -112,8 +113,12 @@ class Profiles:
         if not isinstance(solvers, str):
             solvers = "_".join(sorted(solvers))
         pdf_perf_path = Path(self.perf_dir, f"perf-{solvers}-{self.constraints.replace(' ', '_')}.pdf")
+        csv_perf_path = Path(self.perf_dir, f"perf-{solvers}-{self.constraints.replace(' ', '_')}.csv")
+        txt_perf_path = Path(self.perf_dir, f"perf-{solvers}-{self.constraints.replace(' ', '_')}.txt")
         pdf_data_path = Path(self.data_dir, f"data-{solvers}-{self.constraints.replace(' ', '_')}.pdf")
-        return pdf_perf_path, pdf_data_path
+        csv_data_path = Path(self.data_dir, f"data-{solvers}-{self.constraints.replace(' ', '_')}.csv")
+        txt_data_path = Path(self.data_dir, f"data-{solvers}-{self.constraints.replace(' ', '_')}.txt")
+        return pdf_perf_path, csv_perf_path, txt_perf_path, pdf_data_path, csv_data_path, txt_data_path
 
     def get_storage_path(self, problem, solver, k):
         if problem.sifParams is None:
@@ -165,7 +170,10 @@ class Profiles:
             self.feature = feature_sav
 
         # Start the performance and data profile computations.
-        pdf_perf_path, pdf_data_path = self.get_profiles_path(solvers)
+        pdf_perf_path, csv_perf_path, txt_perf_path, pdf_data_path, csv_data_path, txt_data_path = self.get_profiles_path(solvers)
+        raw_col = (log_tau_max - log_tau_min + 1) * (len(solvers) + 1)
+        raw_perf = np.empty((2 * len(self.problems) + 2, raw_col))
+        raw_data = np.empty((2 * len(self.problems) + 2, raw_col))
         pdf_perf = backend_pdf.PdfPages(pdf_perf_path)
         pdf_data = backend_pdf.PdfPages(pdf_data_path)
         for log_tau in range(log_tau_min, log_tau_max + 1):
@@ -216,9 +224,12 @@ class Profiles:
             y = np.linspace(1 / len(self.problems), 1.0, len(self.problems))
             y = np.repeat(y, 2)[:-1]
             y = np.r_[0, 0, y, y[-1]]
+            i_col = (log_tau - 1) * (len(solvers) + 1)
+            raw_perf[:, i_col] = y
             for j, solver in enumerate(solvers):
                 x = np.repeat(perf[:, j], 2)[1:]
                 x = np.r_[0, x[0], x, penalty * perf_ratio_max]
+                raw_perf[:, i_col + j + 1] = x
                 plt.plot(x, y, label=names[j])
             plt.xlim(0, 1.1 * perf_ratio_max)
             plt.ylim(0, 1)
@@ -238,9 +249,11 @@ class Profiles:
             y = np.linspace(1 / len(self.problems), 1.0, len(self.problems))
             y = np.repeat(y, 2)[:-1]
             y = np.r_[0, 0, y, y[-1]]
+            raw_data[:, i_col] = y
             for j, solver in enumerate(solvers):
                 x = np.repeat(data[:, j], 2)[1:]
                 x = np.r_[0, x[0], x, penalty * data_ratio_max]
+                raw_data[:, i_col + j + 1] = x
                 plt.plot(x, y, label=names[j])
             plt.xlim(0, 1.1 * data_ratio_max)
             plt.ylim(0, 1)
@@ -249,8 +262,26 @@ class Profiles:
             plt.legend(loc="lower right")
             pdf_data.savefig(fig, bbox_inches="tight")
             plt.close()
+
+        logger.info("Saving performance profiles.")
         pdf_perf.close()
+        with open(csv_perf_path, "w") as fd:
+            csv_perf = csv.writer(fd)
+            header_perf = np.array([[f"y{i}", *[f"x{i}_{s}" for s in solvers]] for i in range(log_tau_min, log_tau_max + 1)])
+            csv_perf.writerow(header_perf.flatten())
+            csv_perf.writerows(raw_perf)
+        with open(txt_perf_path, "w") as fd:
+            fd.write("\n".join(p.name for p in self.problems))
+
+        logger.info("Saving data profiles.")
         pdf_data.close()
+        with open(csv_data_path, "w") as fd:
+            csv_data = csv.writer(fd)
+            header_data = np.array([[f"y{i}", *[f"x{i}_{s}" for s in solvers]] for i in range(log_tau_min, log_tau_max + 1)])
+            csv_data.writerow(header_data.flatten())
+            csv_data.writerows(raw_data)
+        with open(txt_perf_path, "w") as fd:
+            fd.write("\n".join(p.name for p in self.problems))
 
     def run_all(self, solvers, options, load, **kwargs):
         merits = np.empty((len(self.problems), len(solvers), self.feature_options["rerun"], self.max_eval))
