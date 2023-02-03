@@ -280,7 +280,7 @@ class Profiles:
             header_data = np.array([[f"y{i}", *[f"x{i}_{s}" for s in solvers]] for i in range(log_tau_min, log_tau_max + 1)])
             csv_data.writerow(header_data.flatten())
             csv_data.writerows(raw_data)
-        with open(txt_perf_path, "w") as fd:
+        with open(txt_data_path, "w") as fd:
             fd.write("\n".join(p.name for p in self.problems))
 
     def run_all(self, solvers, options, load, **kwargs):

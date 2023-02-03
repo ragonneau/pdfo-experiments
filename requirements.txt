@@ -1,0 +1,7 @@
+cycler==0.11.0
+joblib==1.2.0
+matplotlib==3.6.3
+numpy==1.24.1
+pdfo==1.2
+pycutest==1.4
+scipy==1.10.0
