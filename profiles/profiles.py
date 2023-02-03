@@ -285,7 +285,7 @@ class Profiles:
 
     def run_all(self, solvers, options, load, **kwargs):
         merits = np.empty((len(self.problems), len(solvers), self.feature_options["rerun"], self.max_eval))
-        result = Parallel(n_jobs=-1)(self.run_one(problem, solver, k, options[j], load, **kwargs) for problem, (j, solver), k in product(self.problems, enumerate(solvers), range(self.feature_options["rerun"])))
+        result = Parallel(n_jobs=1)(self.run_one(problem, solver, k, options[j], load, **kwargs) for problem, (j, solver), k in product(self.problems, enumerate(solvers), range(self.feature_options["rerun"])))
         for i in range(len(self.problems)):
             for j in range(len(solvers)):
                 for k in range(self.feature_options["rerun"]):
