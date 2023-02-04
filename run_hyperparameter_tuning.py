@@ -48,9 +48,9 @@ if __name__ == "__main__":
     max_eval = 100
     options = {"rhobeg": rhobeg}
 
-    fline = "{:^8} {:^10} {:^13} {:^13} {:^13} {:^13}"
-    rline = "{:^8} {:^10} {:^13.4e} {:^13.4e} {:^13.4e} {:^13.4e}"
-    lsep = "-" * 75
+    fline = "{:^8} {:^13} {:^13} {:^10} {:^16}"
+    rline = "{:^8} {:^13.4e} {:^13.4e} {:^10} {:^16.4e}"
+    lsep = "-" * 64
 
     scaler = MaxAbsScaler(copy=False)
     imputer = SimpleImputer(missing_values=np.nan, strategy="mean", copy=False)
@@ -62,56 +62,49 @@ if __name__ == "__main__":
         imputer.transform(X_test)
         print("Dataset: {}".format(dataset))
         print(lsep)
-        print(fline.format("Solver", "No. eval", "AUC score", "Accuracy", "Exec. time", "Optim. time"))
+        print(fline.format("Solver", "AUC score", "Accuracy", "No. eval", "Exec. time (s)"))
         print(lsep)
 
 
-        def loss(args, eval_time):
-            t0 = time.time()
-            auc_avg = auc(X_train, y_train, **get_params(*args))
-            eval_time.append(time.time() - t0)
-
-            return 1. - auc_avg
+        def loss(args):
+            return 1. - auc(X_train, y_train, **get_params(*args))
 
         # PDFO
         t0 = time.time()
-        eval_time = []
         options["maxfev"] = max_eval
-        res = pdfo(lambda x: loss(x, eval_time), x0, bounds=Bounds(lb, ub), options=options)
+        res = pdfo(loss, x0, bounds=Bounds(lb, ub), options=options)
         elapsed = time.time() - t0
         svm = SVC(**get_params(*res.x), probability=True, random_state=0)
         svm.fit(X_train, y_train)
         auc_score = roc_auc_score(y_test, svm.predict_proba(X_test)[:, 1])
         acc_score = accuracy_score(y_test, svm.predict(X_test))
-        print(rline.format("PDFO", res.nfev, auc_score, acc_score, elapsed, elapsed - sum(eval_time)))
+        print(rline.format("PDFO", auc_score, acc_score, res.nfev, elapsed))
 
         # Random Search
         for k in [1, 2, 3]:
             rng = np.random.default_rng(0)
             t0 = time.time()
-            eval_time = []
             options["maxfev"] = k * max_eval
-            res = fmin(lambda x: loss(x, eval_time), space, rand.suggest, options["maxfev"] - 1, rstate=rng, points_to_evaluate=[x0_dict], verbose=False)
+            res = fmin(loss, space, rand.suggest, options["maxfev"] - 1, rstate=rng, points_to_evaluate=[x0_dict], verbose=False)
             elapsed = time.time() - t0
             svm = SVC(**get_params(*res.values()), probability=True, random_state=0)
             svm.fit(X_train, y_train)
             auc_score = roc_auc_score(y_test, svm.predict_proba(X_test)[:, 1])
             acc_score = accuracy_score(y_test, svm.predict(X_test))
-            print(rline.format("RS", options["maxfev"], auc_score, acc_score, elapsed, elapsed - sum(eval_time)))
+            print(rline.format("RS", auc_score, acc_score, options["maxfev"], elapsed))
 
         # TPE
         for k in [1, 3]:
             rng = np.random.default_rng(0)
             t0 = time.time()
-            eval_time = []
             options["maxfev"] = k * max_eval
-            res = fmin(lambda x: loss(x, eval_time), space, tpe.suggest, options["maxfev"] - 1, rstate=rng, points_to_evaluate=[x0_dict], verbose=False)
+            res = fmin(loss, space, tpe.suggest, options["maxfev"] - 1, rstate=rng, points_to_evaluate=[x0_dict], verbose=False)
             elapsed = time.time() - t0
             svm = SVC(**get_params(*res.values()), probability=True, random_state=0)
             svm.fit(X_train, y_train)
             auc_score = roc_auc_score(y_test, svm.predict_proba(X_test)[:, 1])
             acc_score = accuracy_score(y_test, svm.predict(X_test))
-            print(rline.format("TPE", options["maxfev"], auc_score, acc_score, elapsed, elapsed - sum(eval_time)))
+            print(rline.format("TPE", auc_score, acc_score, options["maxfev"], elapsed))
 
         print(lsep)
         print()
