@@ -25,6 +25,7 @@ def load_libsvm(dataset):
 
 
 def auc(X, y, **kwargs):
+    """5-fold cross validation AUC score."""
     svm = SVC()
     svm.set_params(**kwargs)
     cvs = cross_val_score(svm, X, y, scoring="roc_auc", n_jobs=-1)
@@ -55,6 +56,7 @@ if __name__ == "__main__":
     scaler = MaxAbsScaler(copy=False)
     imputer = SimpleImputer(missing_values=np.nan, strategy="mean", copy=False)
     for dataset in ["splice", "svmguide1", "ijcnn1"]:
+        # Scale and impute the training and testing data.
         X_train, y_train, X_test, y_test = load_libsvm(dataset)
         scaler.fit_transform(X_train)
         scaler.transform(X_test)
@@ -69,7 +71,7 @@ if __name__ == "__main__":
         def loss(args):
             return 1. - auc(X_train, y_train, **get_params(*args))
 
-        # PDFO
+        # Solve the problem with PDFO.
         t0 = time.time()
         options["maxfev"] = max_eval
         res = pdfo(loss, x0, bounds=Bounds(lb, ub), options=options)
@@ -80,7 +82,7 @@ if __name__ == "__main__":
         acc_score = accuracy_score(y_test, svm.predict(X_test))
         print(rline.format("PDFO", auc_score, acc_score, res.nfev, elapsed))
 
-        # Random Search
+        # Solve the problem with RS for different maximum number of function evaluations.
         for k in [1, 2, 3]:
             rng = np.random.default_rng(0)
             t0 = time.time()
@@ -93,7 +95,7 @@ if __name__ == "__main__":
             acc_score = accuracy_score(y_test, svm.predict(X_test))
             print(rline.format("RS", auc_score, acc_score, options["maxfev"], elapsed))
 
-        # TPE
+        # Solve the problem with TPE for different maximum number of function evaluations.
         for k in [1, 3]:
             rng = np.random.default_rng(0)
             t0 = time.time()
